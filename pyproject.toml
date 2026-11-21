@@ -1,0 +1,6 @@
+[project]
+name = "cacheharbor"
+version = "1.0.0"
+description = "Causal cache partitioning on reproducible synthetic traces"
+requires-python = ">=3.11"
+dependencies = []
