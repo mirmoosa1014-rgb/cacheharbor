@@ -1,0 +1,30 @@
+name: Verify CacheHarbor
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
+      - run: python -m unittest discover -s tests -v
+      - run: python -m cacheharbor.experiment --quick --output results/quick
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Browser interactions
+        run: |
+          python -m cacheharbor.server > /tmp/cacheharbor-server.log 2>&1 &
+          SERVER_PID=$!
+          trap 'kill "$SERVER_PID"' EXIT
+          for i in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:8767/api/meta > /dev/null; then break; fi
+            sleep 1
+          done
+          npm run test:browser

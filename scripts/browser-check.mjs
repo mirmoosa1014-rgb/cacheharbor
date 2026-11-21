@@ -1,0 +1,21 @@
+import { chromium } from 'playwright';
+import assert from 'node:assert/strict';
+import { mkdir } from 'node:fs/promises';
+const browser=await chromium.launch({headless:true}),page=await browser.newPage({viewport:{width:1440,height:1100}}),errors=[];
+page.on('pageerror',e=>errors.push(e.message));
+try{
+ await page.goto(process.env.BASE_URL||'http://127.0.0.1:8767');await page.waitForFunction(()=>document.querySelector('#status').textContent.startsWith('Complete'));
+ assert.equal(await page.locator('#floor .block').count(),32);
+ await page.locator('#window').fill('12');await page.locator('#window').dispatchEvent('input');assert.equal(await page.locator('#window-number').textContent(),'13');assert.equal(await page.locator('#curves svg').count(),1);
+ await page.locator('#policy').selectOption('shared');assert.match(await page.locator('#allocation').textContent(),/resident/);
+ await page.locator('#policy').selectOption('adaptive');
+ const downloadPromise=page.waitForEvent('download');await page.locator('#download').click();assert.match((await downloadPromise).suggestedFilename(),/cacheharbor-phase_swap-3001/);
+ let release;const gate=new Promise(r=>release=r);await page.route('**/api/run',async route=>{await gate;await route.continue();});
+ await page.locator('#run').click();assert(await page.locator('#download').isDisabled());assert(await page.locator('#seed').isDisabled());release();await page.waitForFunction(()=>!document.querySelector('#run').disabled);await page.unroute('**/api/run');
+ await page.route('**/api/run',r=>r.fulfill({status:400,contentType:'application/json',body:JSON.stringify({error:'controlled failure'})}));await page.locator('#run').click();await page.waitForFunction(()=>document.querySelector('#status').textContent.startsWith('Run failed'));assert(await page.locator('#download').isDisabled());await page.unroute('**/api/run');
+ await page.locator('#family').selectOption('loop_cliff');await page.locator('#seed').fill('3002');await page.locator('#run').click();await page.waitForFunction(()=>!document.querySelector('#run').disabled);assert.match(await page.locator('#status').textContent(),/3002/);assert(!(await page.locator('#download').isDisabled()));
+ await page.locator('#family').selectOption('phase_swap');await page.locator('#run').click();await page.waitForFunction(()=>!document.querySelector('#run').disabled);await page.locator('#window').fill('15');await page.locator('#window').dispatchEvent('input');
+ await page.emulateMedia({reducedMotion:'reduce'});await mkdir('docs/images',{recursive:true});await page.screenshot({path:'docs/images/demo-desktop.png',fullPage:true});
+ await page.setViewportSize({width:390,height:844});assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await page.screenshot({path:'docs/images/demo-mobile.png',fullPage:true});
+ assert.deepEqual(errors,[]);console.log('Browser checks passed: replay, evidence scrubber, policy switch, export, pending/failure gating, recovery, mobile and reduced motion.');
+}finally{await browser.close();}
