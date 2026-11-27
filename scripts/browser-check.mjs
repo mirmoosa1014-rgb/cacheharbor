@@ -6,6 +6,17 @@ page.on('pageerror',e=>errors.push(e.message));
 try{
  await page.goto(process.env.BASE_URL||'http://127.0.0.1:8767');await page.waitForFunction(()=>document.querySelector('#status').textContent.startsWith('Complete'));
  assert.equal(await page.locator('#floor .block').count(),32);
+ await page.locator('#family').selectOption('balanced');await page.locator('#capacity').selectOption('64');
+ const replay=page.waitForResponse(r=>r.url().endsWith('/api/run')&&r.request().method()==='POST');
+ await page.locator('#run').click();const result=await (await replay).json();await page.waitForFunction(()=>!document.querySelector('#run').disabled);
+ await page.locator('#policy').selectOption('shared');
+ const occupancy=result.results.shared.history[0].occupancy,empty=result.capacity-occupancy[0]-occupancy[1];
+ assert(empty>0,'balanced working sets leave unused cache space');
+ assert.equal(await page.locator('#floor .block[data-owner="A"]').count(),occupancy[0]);
+ assert.equal(await page.locator('#floor .block[data-owner="B"]').count(),occupancy[1]);
+ assert.equal(await page.locator('#floor .block[data-owner="empty"]').count(),empty);
+ assert.match(await page.locator('#allocation').textContent(),new RegExp(`${empty} unused`));
+ await page.locator('#family').selectOption('phase_swap');await page.locator('#capacity').selectOption('32');await page.locator('#run').click();await page.waitForFunction(()=>!document.querySelector('#run').disabled);
  await page.locator('#window').fill('12');await page.locator('#window').dispatchEvent('input');assert.equal(await page.locator('#window-number').textContent(),'13');assert.equal(await page.locator('#curves svg').count(),1);
  await page.locator('#policy').selectOption('shared');assert.match(await page.locator('#allocation').textContent(),/resident/);
  await page.locator('#policy').selectOption('adaptive');

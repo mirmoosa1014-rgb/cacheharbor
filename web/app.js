@@ -5,12 +5,12 @@ const svg=(body,w,h,label)=>`<svg viewBox="0 0 ${w} ${h}" role="img" aria-label=
 const text=(x,y,t,size=11)=>`<text x="${x}" y="${y}" font-size="${size}" fill="#2B2A28">${t}</text>`;
 function stop(){clearInterval(timer);timer=null;$('play').textContent='Play windows';}
 function inspect(){if(!data)return;const policy=$('policy').value,r=data.results[policy],i=Number($('window').value),w=r.history[i];$('window-number').value=i+1;
- const quota=w.quota||w.occupancy,n=data.capacity;let blocks='';
- for(let j=0;j<n;j++){const tenant=j<quota[0]?0:1,col=j%8,row=Math.floor(j/8),x=400+(col-row)*37,y=36+(col+row)*15,c=colors[tenant];
- blocks+=`<g class="block" style="animation-delay:${Math.min(j,12)*.08}s"><ellipse cx="${x}" cy="${y+44}" rx="25" ry="9" fill="#6E675F" opacity=".12"/><path d="M${x},${y} l30,15 -30,15 -30,-15z" fill="${tenant===0?'#F0A48F':'#81B29A'}"/><path d="M${x-30},${y+15} l30,15 0,27 -30,-15z" fill="${c}"/><path d="M${x},${y+30} l30,-15 0,27 -30,15z" fill="${tenant===0?'#C45B42':'#3D405B'}"/><title>Tenant ${tenant===0?'A':'B'}: line ${j+1}</title></g>`;}
+ const quota=w.quota||w.occupancy,n=data.capacity,unused=n-quota[0]-quota[1];let blocks='';
+ for(let j=0;j<n;j++){const tenant=j<quota[0]?0:j<quota[0]+quota[1]?1:null,col=j%8,row=Math.floor(j/8),x=400+(col-row)*37,y=36+(col+row)*15,c=tenant===null?'#D4CEC3':colors[tenant],owner=tenant===null?'empty':tenant===0?'A':'B';
+ blocks+=`<g class="block" data-owner="${owner}" style="animation-delay:${Math.min(j,12)*.08}s"><ellipse cx="${x}" cy="${y+44}" rx="25" ry="9" fill="#6E675F" opacity=".12"/><path d="M${x},${y} l30,15 -30,15 -30,-15z" fill="${tenant===null?'#F4EFE6':tenant===0?'#F0A48F':'#81B29A'}"/><path d="M${x-30},${y+15} l30,15 0,27 -30,-15z" fill="${c}"/><path d="M${x},${y+30} l30,-15 0,27 -30,15z" fill="${tenant===null?'#B8B0A3':tenant===0?'#C45B42':'#3D405B'}"/><title>${tenant===null?'Unused cache space':'Tenant '+owner}: line ${j+1}</title></g>`;}
  const left=400-(Math.ceil(n/8)-1)*37-45,right=400+7*37+45,bottom=36+(7+Math.ceil(n/8)-1)*15+65;
- $('floor').innerHTML=svg(blocks,800,320,'Cache allocation: '+quota[0]+' lines A, '+quota[1]+' lines B').replace('0 0 800 320',`${left} 0 ${right-left} ${bottom}`);
- $('allocation').textContent=`${names[policy]} · A ${quota[0]} / B ${quota[1]} lines${w.quota?' allocated':' resident (no quotas)'}`;
+ $('floor').innerHTML=svg(blocks,800,320,'Cache allocation: '+quota[0]+' lines A, '+quota[1]+' lines B, '+unused+' unused').replace('0 0 800 320',`${left} 0 ${right-left} ${bottom}`);
+ $('allocation').textContent=`${names[policy]} · A ${quota[0]} / B ${quota[1]} lines${w.quota?' allocated':` resident (no quotas) · ${unused} unused`}`;
  $('epoch').textContent=`References ${w.start+1}–${w.end} · misses A ${w.misses[0]}/${w.accesses[0]}, B ${w.misses[1]}/${w.accesses[1]} · resident at window end: ${w.occupancy.join(' / ')}`;
  const curves=w.decision_curves;
  if(!curves){$('curves').innerHTML='<p>No earlier window exists. The adaptive policy starts with an equal split.</p>';$('decision').textContent='Cold-start misses are included.';}
