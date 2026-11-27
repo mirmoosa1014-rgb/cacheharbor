@@ -25,7 +25,9 @@ class Handler(SimpleHTTPRequestHandler):
         try:
             n=int(self.headers.get('Content-Length','0'))
             if not 0<n<=512:raise ValueError('request must contain 1–512 bytes')
-            data=json.loads(self.rfile.read(n))
+            raw_body=self.rfile.read(n)
+            if len(raw_body)!=n:raise ValueError('incomplete request body')
+            data=json.loads(raw_body)
             if not isinstance(data,dict) or set(data)-{'seed','family','capacity'}:raise ValueError('provide seed, family and capacity only')
             seed=integer(data.get('seed',3001),0,100000,'seed');capacity=integer(data.get('capacity',32),4,64,'capacity')
             family=data.get('family','phase_swap')
